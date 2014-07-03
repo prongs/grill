@@ -70,16 +70,19 @@ public class GrillRDDClient {
   private static final String TEMP_TABLE_PART_COL = "dumm_partition_column";
   private static final String TEMP_TABLE_PART_VAL = "placeholder_value";
 
-  private final JavaSparkContext sparkContext;
-  private transient final HiveConf hiveConf = new HiveConf();
-  private transient GrillClient grillClient;
+  private static final HiveConf hiveConf = new HiveConf();
+  static {
+    hiveConf.setVar(HiveConf.ConfVars.METASTOREURIS, "");
+  }
+
+  private final JavaSparkContext sparkContext; // Spark context
+  private GrillClient grillClient; // Grill client instance. Initialized lazily.
 
   /**
    * Create an RDD client with given spark Context
    */
   public GrillRDDClient(JavaSparkContext sparkContext) {
     this.sparkContext = sparkContext;
-    hiveConf.setVar(HiveConf.ConfVars.METASTOREURIS, "");
   }
 
   /**
@@ -87,6 +90,15 @@ public class GrillRDDClient {
    */
   public GrillRDDClient(SparkContext sc) {
     this(new JavaSparkContext(sc));
+  }
+
+  public GrillRDDClient(JavaSparkContext sparkContext, GrillClient grillClient) {
+    this.sparkContext = sparkContext;
+    this.grillClient = grillClient;
+  }
+
+  public GrillRDDClient(SparkContext sparkContext, GrillClient grillClient) {
+    this(new JavaSparkContext(sparkContext), grillClient);
   }
 
   private synchronized GrillClient getClient() {
@@ -121,7 +133,7 @@ public class GrillRDDClient {
   /**
    * Get the RDD created for the query. This should be used only is isReadyForRDD returns true
    */
-  public RDD<List<Object>> getRDD(QueryHandle queryHandle) throws GrillException {
+  public GrillRDDResult getRDD(QueryHandle queryHandle) throws GrillException {
     QueryStatus status = getClient().getQueryStatus(queryHandle);
     if (!status.isFinished() && !status.isResultSetAvailable()) {
       throw new GrillException(queryHandle.getHandleId() + " query not finished or result unavailable");
@@ -160,7 +172,7 @@ public class GrillRDDClient {
       throw new GrillException("Error creating RDD for table " + tempTableName, e);
     }
 
-    return rdd.map(new HCatRecordToObjectListMapper()).rdd();
+    return new GrillRDDResult(rdd.map(new HCatRecordToObjectListMapper()).rdd(), queryHandle, tempTableName);
   }
 
   // Create a temp table with schema of the result set and location
@@ -191,21 +203,21 @@ public class GrillRDDClient {
     Map<String, String> partSpec = new HashMap<String, String>();
     partSpec.put(TEMP_TABLE_PART_COL, TEMP_TABLE_PART_VAL);
     partitionDesc.addPartition(partSpec, persistentQueryResult.getPersistedURI());
-
     hiveClient.createPartitions(partitionDesc);
     LOG.info("Created partition in " + tableName + " for data in " + persistentQueryResult.getPersistedURI());
+
     return tableName;
   }
 
   // Convert grill data type to Hive data type.
   private String toHiveType(ResultColumnType type) {
-    return null;
+    return type.name();
   }
 
   /**
    * Blocking call to create an RDD from a Grill query. Return only when the query is complete.
    */
-  public RDD<List<Object>> createGrillRDD(String query) throws GrillException {
+  public GrillRDDResult createGrillRDD(String query) throws GrillException {
     QueryHandle queryHandle = createGrillRDDAsync(query);
     while (!isReadyForRDD(queryHandle)) {
       try {
@@ -217,4 +229,46 @@ public class GrillRDDClient {
     }
     return getRDD(queryHandle);
   }
+
+  /**
+   * Container object to store the RDD and corresponding Grill query handle.
+   */
+  public static class GrillRDDResult {
+    private final RDD<List<Object>> resultRDD;
+    private final QueryHandle grillQuery;
+    private final String tempTableName;
+
+    public GrillRDDResult(RDD<List<Object>> rdd, QueryHandle grillQuery, String tempTableName) {
+      this.resultRDD = rdd;
+      this.grillQuery = grillQuery;
+      this.tempTableName = tempTableName;
+    }
+
+    public QueryHandle getGrillQuery() {
+      return grillQuery;
+    }
+
+    public RDD<List<Object>> getRDD() {
+      return resultRDD;
+    }
+
+    public String getTempTableName() {
+      return tempTableName;
+    }
+
+    /**
+     * Delete temp table. This should be done to release underlying temp table.
+     */
+    public void deleteTempTable() throws GrillException {
+      Hive hiveClient = null;
+      try {
+        hiveClient = Hive.get(hiveConf);
+        hiveClient.dropTable(tempTableName);
+        LOG.info("Dropped temp table " + tempTableName);
+      } catch (HiveException e) {
+        throw new GrillException(e);
+      }
+    }
+  }
+
 }
