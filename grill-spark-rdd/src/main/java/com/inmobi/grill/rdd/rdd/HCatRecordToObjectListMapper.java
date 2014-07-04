@@ -1,4 +1,4 @@
-package com.inmobi.grill.server.ml.spark.rdd;
+package com.inmobi.grill.rdd.rdd;
 
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hive.hcatalog.data.HCatRecord;

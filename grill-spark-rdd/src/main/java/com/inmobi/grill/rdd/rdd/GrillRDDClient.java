@@ -1,4 +1,4 @@
-package com.inmobi.grill.server.ml.spark.rdd;
+package com.inmobi.grill.rdd.rdd;
 
 import com.inmobi.grill.api.GrillException;
 import com.inmobi.grill.api.query.*;
