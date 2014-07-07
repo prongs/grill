@@ -28,7 +28,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <artifactId>hadoop-client</artifactId>
     </dependency>
 		<dependency>
 			<groupId>c3p0</groupId>

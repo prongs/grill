@@ -345,7 +345,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-common</artifactId>
+                <artifactId>hadoop-client</artifactId>
                 <version>${hadoop.version}</version>
                 <!-- <scope>provided</scope> -->
                 <exclusions>
@@ -478,6 +478,12 @@
             <dependency>
                 <groupId>org.apache.hive</groupId>
                 <artifactId>hive-service</artifactId>
+                <version>${hive.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-serde</artifactId>
                 <version>${hive.version}</version>
                 <scope>provided</scope>
             </dependency>
@@ -700,12 +706,6 @@
                 <version>${sparkVersion}</version>
                 <scope>provided</scope>
             </dependency>
-            <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-mapreduce-client-core</artifactId>
-                <scope>provided</scope>
-                <version>${hadoop.version}</version>
-            </dependency>
 
         </dependencies>
 
@@ -744,8 +744,6 @@
         <module>grill-examples</module>
         <module>grill-dist</module>
         <module>grill-client-dist</module>
-        <module>grill-spark-lib</module>
-        <module>gril-spark-rdd</module>
         <module>grill-query-lib</module>
     </modules>
 

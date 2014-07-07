@@ -344,6 +344,7 @@
 <property>
     <name>grill.ml.model.basedir</name>
     <value>.</value>
+    <description>Default location to store serialized ML models</description>
 </property>
 
 </configuration>
