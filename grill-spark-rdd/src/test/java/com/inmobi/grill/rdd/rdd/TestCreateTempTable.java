@@ -73,26 +73,37 @@ public class TestCreateTempTable {
     columns.add(new ResultColumn("value", ResultColumnType.INT));
 
     QueryResultSetMetadata metadata = new QueryResultSetMetadata(columns);
-
-    String tableName = rddClient.createTempMetastoreTable(dataDir.toURI().toString(), metadata);
-    assertNotNull(tableName);
-
     Hive metastoreClient = Hive.get(GrillRDDClient.hiveConf);
-    Table tbl = metastoreClient.getTable("default", tableName);
-    assertNotNull(tbl);
-    assertEquals(tbl.getTableName(), tableName);
-    List<FieldSchema> partCols = tbl.getPartCols();
-    assertNotNull(partCols);
-    assertEquals(partCols.size(), 1);
+    String tableName = null;
+    try {
+      tableName = rddClient.createTempMetastoreTable(dataDir.toURI().toString(), metadata);
+      assertNotNull(tableName);
 
-    List<FieldSchema> tableColumns = tbl.getAllCols();
-    assertEquals(tableColumns.size(), 3);
+      Table tbl = metastoreClient.getTable("default", tableName);
+      assertNotNull(tbl);
+      assertEquals(tbl.getTableName(), tableName);
+      List<FieldSchema> partCols = tbl.getPartCols();
+      assertNotNull(partCols);
+      assertEquals(partCols.size(), 1);
 
-    Set<Partition> partitions = metastoreClient.getAllPartitionsOf(tbl);
-    assertEquals(partitions.size(), 1);
+      List<FieldSchema> tableColumns = tbl.getAllCols();
+      assertEquals(tableColumns.size(), 3);
 
-    Partition partition = partitions.iterator().next();
-    assertEquals(partition.getLocation() + "/", dataDir.toURI().toString());
+      Set<Partition> partitions = metastoreClient.getAllPartitionsOf(tbl);
+      assertEquals(partitions.size(), 1);
+
+      Partition partition = partitions.iterator().next();
+      assertEquals(partition.getLocation() + "/", dataDir.toURI().toString());
+    } finally {
+      if (tableName != null) {
+        try {
+          metastoreClient.dropTable("default", tableName);
+        } catch (Exception exc) {
+          exc.printStackTrace();
+        }
+      }
+    }
+
   }
 
 }
