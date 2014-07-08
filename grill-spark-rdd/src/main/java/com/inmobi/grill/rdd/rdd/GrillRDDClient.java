@@ -15,8 +15,8 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AddPartitionDesc;
 import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.mapred.TextOutputFormat;
-import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hive.hcatalog.data.HCatRecord;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -73,6 +73,10 @@ public class GrillRDDClient {
   protected static final HiveConf hiveConf = new HiveConf();
   static {
     hiveConf.setVar(HiveConf.ConfVars.METASTOREURIS, "");
+    hiveConf.set("javax.jdo.option.ConnectionURL", "jdbc:derby:;databaseName=./metastore_db;create=true");
+    hiveConf.set("javax.jdo.option.ConnectionDriverName", "org.apache.derby.jdbc.EmbeddedDriver");
+    hiveConf.setBoolean("hive.metastore.local", true);
+    hiveConf.set("hive.metastore.warehouse.dir", "file://${user.dir}/warehouse");
   }
 
   private final JavaSparkContext sparkContext; // Spark context
