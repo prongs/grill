@@ -8,12 +8,12 @@ import com.inmobi.grill.server.ml.spark.HiveTableRDD;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AddPartitionDesc;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -67,10 +67,10 @@ public class GrillRDDClient {
   private static final String OUTPUT_FORMAT = TextOutputFormat.class.getName();
   // Name of partition column and its value. There is always exactly one partition in the table created from
   // Result set.
-  private static final String TEMP_TABLE_PART_COL = "dumm_partition_column";
+  private static final String TEMP_TABLE_PART_COL = "dummy_partition_column";
   private static final String TEMP_TABLE_PART_VAL = "placeholder_value";
 
-  private static final HiveConf hiveConf = new HiveConf();
+  protected static final HiveConf hiveConf = new HiveConf();
   static {
     hiveConf.setVar(HiveConf.ConfVars.METASTOREURIS, "");
   }
@@ -139,7 +139,7 @@ public class GrillRDDClient {
       throw new GrillException(queryHandle.getHandleId() + " query not finished or result unavailable");
     }
 
-    GrillClient.GrillClientResultSetWithStats result = getClient().getAsyncResults(queryHandle);
+    GrillClient.GrillClientResultSetWithStats result = getClient().getPersistentResultSet(queryHandle);
 
     if (result.getResultSet() == null) {
       throw new GrillException("Result set not available for query " + queryHandle.getHandleId());
@@ -157,7 +157,7 @@ public class GrillRDDClient {
 
     String tempTableName;
     try {
-      tempTableName = createTempMetastoreTable(persistentQueryResult, metadata);
+      tempTableName = createTempMetastoreTable(persistentQueryResult.getPersistedURI(), metadata);
     } catch (HiveException e) {
       throw new GrillException("Error creating temp table from result set", e);
     }
@@ -176,24 +176,24 @@ public class GrillRDDClient {
   }
 
   // Create a temp table with schema of the result set and location
-  private String createTempMetastoreTable(PersistentQueryResult persistentQueryResult,
+  protected String createTempMetastoreTable(String dataLocation,
                                           QueryResultSetMetadata metadata) throws HiveException {
     String tableName = "grill_rdd_" + UUID.randomUUID().toString().replace("-", "_");
 
     Hive hiveClient = Hive.get(hiveConf);
-    Table tbl = hiveClient.newTable(tableName);
+    Table tbl = hiveClient.newTable("default." + tableName);
+    tbl.setTableType(TableType.MANAGED_TABLE);
     tbl.setInputFormatClass(INPUT_FORMAT);
-    tbl.setOutputFormatClass(OUTPUT_FORMAT);
+    //String outputFormat = null;
+    //tbl.setOutputFormatClass(outputFormat);
 
     // Add columns
     for (ResultColumn rc : metadata.getColumns()) {
       tbl.getCols().add(new FieldSchema(rc.getName(), toHiveType(rc.getType()), "default"));
+      System.out.println("@@@@ COL " + rc.getName() + " TYPE " + toHiveType(rc.getType()));
     }
 
-    tbl.getPartCols().add(new FieldSchema("dumm_partition_column", "STRING", "default"));
-    tbl.setSerializationLib(LazySimpleSerDe.class.getName());
-    tbl.setNumBuckets(-1);
-    tbl.setBucketCols(null);
+    tbl.getPartCols().add(new FieldSchema(TEMP_TABLE_PART_COL, "string", "default"));
     hiveClient.createTable(tbl);
 
     LOG.info("Table " + tableName + " created");
@@ -202,16 +202,16 @@ public class GrillRDDClient {
     AddPartitionDesc partitionDesc = new AddPartitionDesc("default", tableName, false);
     Map<String, String> partSpec = new HashMap<String, String>();
     partSpec.put(TEMP_TABLE_PART_COL, TEMP_TABLE_PART_VAL);
-    partitionDesc.addPartition(partSpec, persistentQueryResult.getPersistedURI());
+    partitionDesc.addPartition(partSpec, dataLocation);
     hiveClient.createPartitions(partitionDesc);
-    LOG.info("Created partition in " + tableName + " for data in " + persistentQueryResult.getPersistedURI());
+    LOG.info("Created partition in " + tableName + " for data in " + dataLocation);
 
     return tableName;
   }
 
   // Convert grill data type to Hive data type.
   private String toHiveType(ResultColumnType type) {
-    return type.name();
+    return type.name().toLowerCase();
   }
 
   /**

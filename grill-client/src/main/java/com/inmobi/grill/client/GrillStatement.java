@@ -285,6 +285,10 @@ public class GrillStatement {
     return this.getResultSet(this.query);
   }
 
+  public PersistentQueryResult getPersistentResultSet() {
+    return this.getPersistentResultSet(this.query);
+  }
+
   public InMemoryQueryResult getResultSet(GrillQuery query) {
     if (query.getStatus().getStatus() != QueryStatus.Status.SUCCESSFUL) {
       throw new IllegalArgumentException("Result set metadata " +
@@ -298,6 +302,24 @@ public class GrillStatement {
           path("resultset").queryParam(
               "sessionid", connection.getSessionHandle()).request().get(
                   InMemoryQueryResult.class);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to get resultset, cause:" + e.getMessage());
+    }
+  }
+
+  public PersistentQueryResult getPersistentResultSet(GrillQuery query) {
+    if (query.getStatus().getStatus() != QueryStatus.Status.SUCCESSFUL) {
+      throw new IllegalArgumentException("Result set metadata " +
+        "can be only queries for successful queries");
+    }
+    Client client = ClientBuilder.newClient();
+
+    try {
+      WebTarget target = getQueryWebTarget(client);
+      return target.path(query.getQueryHandle().toString()).
+        path("resultset").queryParam(
+        "sessionid", connection.getSessionHandle()).request().get(
+        PersistentQueryResult.class);
     } catch (Exception e) {
       throw new IllegalStateException("Failed to get resultset, cause:" + e.getMessage());
     }

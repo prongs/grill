@@ -114,6 +114,21 @@ public class GrillClient {
     return new GrillClientResultSetWithStats(result, statement.getQuery());
   }
 
+  public GrillClientResultSetWithStats getPersistentResultSet(QueryHandle q) {
+    GrillStatement statement = new GrillStatement(conn);
+    GrillQuery query = statement.getQuery(q);
+    if (query.getStatus().getStatus()
+      == QueryStatus.Status.FAILED) {
+      throw new IllegalStateException(query.getStatus().getErrorMessage());
+    }
+    GrillClientResultSet result = null;
+    if (statement.getStatus().isResultSetAvailable()) {
+      result = new GrillClientResultSet(statement.getPersistentResultSet(),
+        statement.getResultSetMetaData());
+    }
+    return new GrillClientResultSetWithStats(result, statement.getQuery());
+  }
+
   public GrillClientResultSetWithStats getAsyncResults(QueryHandle q) {
     return getResultsFromHandle(q);
   }
