@@ -24,6 +24,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.rdd.RDD;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -237,10 +238,10 @@ public class GrillRDDClient {
   /**
    * Container object to store the RDD and corresponding Grill query handle.
    */
-  public static class GrillRDDResult {
-    private final RDD<List<Object>> resultRDD;
-    private final QueryHandle grillQuery;
-    private final String tempTableName;
+  public static class GrillRDDResult implements Serializable {
+    private transient RDD<List<Object>> resultRDD;
+    private QueryHandle grillQuery;
+    private String tempTableName;
 
     public GrillRDDResult(RDD<List<Object>> rdd, QueryHandle grillQuery, String tempTableName) {
       this.resultRDD = rdd;
@@ -248,11 +249,36 @@ public class GrillRDDClient {
       this.tempTableName = tempTableName;
     }
 
+    public GrillRDDResult() {
+
+    }
+
     public QueryHandle getGrillQuery() {
       return grillQuery;
     }
 
     public RDD<List<Object>> getRDD() {
+      return resultRDD;
+    }
+
+    /**
+     * Recreate RDD. This will work if the result object was saved. As long as the metastore and corresponding
+     * HDFS directory is available result object should be able to recreate an RDD.
+     * @param sparkContext
+     * @return
+     * @throws GrillException
+     */
+    public RDD<List<Object>> recreateRDD(JavaSparkContext sparkContext) throws GrillException {
+      if (resultRDD == null) {
+        try {
+          JavaPairRDD<WritableComparable, HCatRecord> javaPairRDD = HiveTableRDD.createHiveTableRDD(sparkContext, hiveConf, "default", tempTableName,
+            TEMP_TABLE_PART_COL + "='" + TEMP_TABLE_PART_VAL + "'");
+          LOG.info("Created RDD " + resultRDD.name() + " for table " + tempTableName);
+          resultRDD = javaPairRDD.map(new HCatRecordToObjectListMapper()).rdd();
+        } catch (IOException e) {
+          throw new GrillException("Error creating RDD for table " + tempTableName, e);
+        }
+      }
       return resultRDD;
     }
 
@@ -267,7 +293,7 @@ public class GrillRDDClient {
       Hive hiveClient = null;
       try {
         hiveClient = Hive.get(hiveConf);
-        hiveClient.dropTable(tempTableName);
+        hiveClient.dropTable("default." + tempTableName);
         LOG.info("Dropped temp table " + tempTableName);
       } catch (HiveException e) {
         throw new GrillException(e);
