@@ -1,9 +1,10 @@
-package com.inmobi.grill.server;
+package com.inmobi.grill.server.ui;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.io.Files;
+import com.inmobi.grill.server.GrillServices;
 import com.inmobi.grill.server.api.GrillConfConstants;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -18,7 +19,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.concurrent.TimeUnit;
 
-@Path("/")
+@Path("/static")
 public class StaticFileResource {
   public static final Log LOG = LogFactory.getLog(StaticFileResource.class);
 
