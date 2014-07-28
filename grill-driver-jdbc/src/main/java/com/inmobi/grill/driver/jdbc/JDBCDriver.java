@@ -193,8 +193,12 @@ public class JDBCDriver implements GrillDriver {
             } else {
               LOG.error(
                   "Error executing SQL query: " + queryContext.getGrillContext().getQueryHandle()
+                  + " rewritten query: " + queryContext.rewrittenQuery
                   + " reason: " + sqlEx.getMessage(), sqlEx);
               result.error = sqlEx;
+              // Close connection in case of failed queries. For successful queries, connection is closed
+              // When result set is closed or driver.closeQuery is called
+              result.close();
               queryContext.notifyError(sqlEx);
             }
           }
@@ -271,7 +275,7 @@ public class JDBCDriver implements GrillDriver {
       throw new IllegalStateException("JDBC Driver is not configured!");
   }
 
-  protected synchronized Connection getConnection(Configuration conf) throws GrillException {
+  public synchronized Connection getConnection(Configuration conf) throws GrillException {
     try {
       //Add here to cover the path when the queries are executed it does not
       //use the driver conf
